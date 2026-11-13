@@ -1,0 +1,21 @@
+# Lista blanca: nada entra al contexto de construcción salvo lo necesario para ejecutar.
+*
+
+!package.json
+!bun.lock
+!tsconfig.json
+!src/
+!agent/
+!web/
+!fixtures/
+
+# Defensa en profundidad: aunque una regla de arriba cambie, estos NUNCA entran a la imagen.
+**/.env
+**/.env.*
+**/out
+**/node_modules
+**/backups*
+**/*.pem
+**/*.key
+.git
+.gitignore

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agente de Órdenes de Compra · SAP</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">OC</span>
+      <div>
+        <h1>Agente de Órdenes de Compra</h1>
+        <p class="sub">Preparación y creación en SAP (simulado) · confirmación humana obligatoria</p>
+      </div>
+    </div>
+    <span id="health" class="pill pill-neutral" role="status">Verificando…</span>
+  </header>
+
+  <div id="aviso-ia" class="banner banner-error" hidden></div>
+  <div id="aviso-efimero" class="banner banner-aviso" role="note" hidden>
+    <strong>Modo demostración:</strong> el almacenamiento es efímero. Las órdenes, sesiones, confirmaciones y registros se <strong>pierden al reiniciar o suspender</strong> el servicio (en Render Free se suspende tras 15 minutos sin tráfico) y la numeración de OC vuelve a 4500000001.
+  </div>
+
+  <main class="layout">
+    <section class="chat" aria-label="Conversación">
+      <div id="mensajes" class="mensajes" role="log" aria-live="polite" aria-relevant="additions">
+        <div id="bienvenida" class="bienvenida">
+          <h2>¿Qué solicitud procesamos?</h2>
+          <p>Pide al agente que procese un caso. Valida contra los maestros, te muestra la OC y solo la crea con tu confirmación cuando hay excepciones.</p>
+          <div class="chips" id="chips"></div>
+        </div>
+      </div>
+
+      <div id="procesando" class="procesando" hidden aria-live="polite">
+        <span class="puntos" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span>El agente está trabajando…</span>
+      </div>
+
+      <section id="confirmacion" class="confirmacion" hidden aria-labelledby="conf-titulo">
+        <div class="conf-cabecera">
+          <span class="conf-icono" aria-hidden="true">!</span>
+          <div>
+            <h2 id="conf-titulo">Confirmación humana requerida</h2>
+            <p id="conf-detalle"></p>
+          </div>
+        </div>
+        <p class="conf-nota">La OC no se crea hasta que confirmes. El sistema valida tu respuesta; si la rechazas, el caso se descarta.</p>
+        <div class="conf-botones">
+          <button id="btn-confirmar" class="btn btn-ok" type="button">Confirmo</button>
+          <button id="btn-rechazar" class="btn btn-no" type="button">No confirmo</button>
+        </div>
+      </section>
+
+      <form id="form" class="entrada" autocomplete="off">
+        <label for="texto" class="sr-only">Mensaje</label>
+        <textarea id="texto" rows="1" maxlength="4000" placeholder="Ej.: Procesa la solicitud sol-004 y no la crees hasta que yo lo confirme" required></textarea>
+        <button id="btn-enviar" class="btn btn-primario" type="submit">Enviar</button>
+      </form>
+    </section>
+
+    <aside class="panel" aria-label="Estado de la sesión">
+      <h2>Sesión</h2>
+      <dl class="datos">
+        <dt>Identificador</dt><dd id="s-id">—</dd>
+        <dt>Estado</dt><dd><span id="s-estado" class="pill pill-neutral">Sin iniciar</span></dd>
+        <dt>Caso pendiente</dt><dd id="s-pendiente">Ninguno</dd>
+        <dt>Modelo</dt><dd id="s-modelo">—</dd>
+      </dl>
+      <label for="s-tokens" class="etiqueta">Tokens de la sesión <span id="s-tokens-txt">0</span></label>
+      <progress id="s-tokens" max="1" value="0"></progress>
+      <button id="btn-nueva" class="btn btn-sec" type="button">Nueva sesión</button>
+      <p class="nota">Las llamadas a herramientas que hace el agente aparecen en la conversación con sus argumentos y su resultado.</p>
+    </aside>
+  </main>
+
+  <section id="acceso" class="acceso" role="dialog" aria-modal="true" aria-labelledby="acceso-titulo" hidden>
+    <form id="form-acceso" class="acceso-tarjeta" autocomplete="off">
+      <h2 id="acceso-titulo">Acceso restringido</h2>
+      <p>Ingresa la clave de acceso para usar el agente.</p>
+      <label for="clave" class="sr-only">Clave de acceso</label>
+      <input id="clave" type="password" autocomplete="off" spellcheck="false" maxlength="200" required placeholder="Clave de acceso">
+      <p id="acceso-error" class="acceso-error" role="alert" hidden></p>
+      <button id="btn-acceso" class="btn btn-primario" type="submit">Entrar</button>
+      <p class="nota">La clave se guarda solo en esta pestaña (sessionStorage) y se borra al cerrarla.</p>
+    </form>
+  </section>
+
+  <script src="/app.js" defer></script>
+</body>
+</html>

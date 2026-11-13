@@ -1,0 +1,35 @@
+# Blueprint de Render para el Reto 3 (plan gratuito, Docker, despliegue MANUAL).
+# El plan Free NO tiene disco persistente: out/ se pierde al redesplegar, reiniciar o suspender.
+services:
+  - type: web
+    name: reto-03-agente-oc
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    # Entre comillas: sin ellas YAML interpreta off como booleano false. Cada despliegue borra out/.
+    autoDeployTrigger: "off"
+    envVars:
+      # Secretos: se piden en el panel de Render y NO se sincronizan desde este archivo.
+      - key: LLM_API_KEY
+        sync: false
+      - key: ACCESS_KEY
+        sync: false
+      # No secretos.
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: "10000"
+      - key: LLM_MODEL
+        value: claude-opus-5-5
+      - key: EPHEMERAL_STORAGE
+        value: "true"
+      - key: RATE_LIMIT_CHAT_PER_MIN
+        value: "20"
+      - key: GLOBAL_TOKEN_BUDGET
+        value: "500000"
+      # Desactivado hasta validar con /api/diagnostico qué cabecera lleva la IP del cliente en Render.
+      - key: TRUST_PROXY
+        value: "false"
