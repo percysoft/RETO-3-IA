@@ -1,6 +1,6 @@
 # SOLUCION — Agente conversacional de Órdenes de Compra SAP
 
-Documento técnico para evaluadores. Todo lo que se afirma como «implementado» está verificado por las pruebas (`bun test`: 200 pruebas), por la ejecución de `bun run demo` (sin LLM) o por las **ejecuciones reales con Anthropic de los seis casos de aceptación** (sección 5.2); lo que no se pudo verificar se marca explícitamente. Las secciones 1–12 siguen la estructura pedida para esta fase; las secciones 13–18 cubren lo que exige además el PRD §9.1 (modelo y costo, lectura del proceso, cobertura, uso de IA, riesgos) y el plan de despliegue. Lo implementado y lo pendiente se mantienen separados (secciones 12, 15 y 18).
+Documento técnico para evaluadores. Todo lo que se afirma como «implementado» está verificado por las pruebas (`bun test`: 207 pruebas), por la ejecución de `bun run demo` (sin LLM) o por las **ejecuciones reales con Anthropic de los seis casos de aceptación** (sección 5.2); lo que no se pudo verificar se marca explícitamente. Las secciones 1–12 siguen la estructura pedida para esta fase; las secciones 13–18 cubren lo que exige además el PRD §9.1 (modelo y costo, lectura del proceso, cobertura, uso de IA, riesgos) y el plan de despliegue. Lo implementado y lo pendiente se mantienen separados (secciones 12, 15 y 18).
 
 ## 1. Problema y solución propuesta
 
@@ -14,6 +14,10 @@ Documento técnico para evaluadores. Todo lo que se afirma como «implementado»
 Lo bloqueante se bloquea; lo dudoso se convierte en una pregunta explícita al humano; lo retroactivo se marca.
 
 ## 2. Arquitectura y responsabilidades
+
+![Arquitectura del sistema](docs/arquitectura.png)
+
+Resumen de cierre, resultados reales y mejoras futuras: [docs/INFORME.md](docs/INFORME.md).
 
 | Módulo | Responsabilidad |
 |---|---|
@@ -227,6 +231,7 @@ La garantía de seguridad **no descansa en que el modelo se porte bien**, sino e
 | **Secretos** | La clave se lee solo del entorno del backend; se redacta de logs, sesiones, errores y respuestas; no hay clave en el repo ni `.env` versionado (`.gitignore`). Verificado por pruebas. |
 | **Entrada HTTP** | Validación Zod estricta, límite de 16 KB, `Content-Type` obligatorio, CORS restrictivo (mismo origen + lista blanca; origen ajeno → 403), límite por IP, errores 500 genéricos (sin stack traces). |
 | **Acceso al link público** | `ACCESS_KEY` obligatoria con `NODE_ENV=production` (≥ 16 caracteres; sin ella el servidor no arranca y el error no revela la clave). Protege `/api/chat`, `/api/sessions/:id` y `/api/diagnostico` con la cabecera `X-Access-Key`; `/api/health` y los estáticos son públicos. Comparación en tiempo constante (SHA-256 + `timingSafeEqual`); tras 10 fallos por minuto desde una IP se responde 429 sin bloquear nunca la clave correcta. El front la pide en una pantalla de acceso, la valida sin gastar tokens y la guarda solo en `sessionStorage`. |
+| **Demo pública abierta (`ALLOW_OPEN_ACCESS=true`)** | Alternativa explícita a la clave: con `NODE_ENV=production` permite arrancar sin `ACCESS_KEY` (no puede combinarse con ella), avisa en el log al arrancar y declara `acceso: "abierto"` en `/api/health`; `/api/diagnostico` no existe. **Riesgo asumido:** cualquiera con el enlace puede usar el agente y consumir la clave de IA; solo lo acotan el límite de frecuencia (compartido por todos los usuarios mientras `TRUST_PROXY=false`), `GLOBAL_TOKEN_BUDGET` y el límite de gasto de la consola de Anthropic. Es la configuración actual de `render.yaml`. |
 | **IP del cliente tras un proxy** | `TRUST_PROXY` desactivado por defecto: no se confía en ninguna cabecera. Si se activa, se usa la entrada N-ésima desde la **derecha** de la cadena (las de la izquierda las falsifica el cliente), validada como IP; si no, la IP del socket. `/api/diagnostico` permite comprobar en Render qué cabecera llega realmente. |
 | **Gasto global de tokens** | `GLOBAL_TOKEN_BUDGET`: tope del proceso con reserva atómica antes de cada llamada al modelo (llamadas concurrentes no lo superan; probado). Se reinicia con el proceso; el límite de gasto de la consola de Anthropic sigue siendo la protección de fondo. |
 | **XSS en el front** | El texto del usuario se muestra con `textContent`; las respuestas del agente pasan por un renderizador que **escapa todo primero** y solo después agrega etiquetas propias (negritas, tablas, listas); CSP `script-src 'self'; style-src 'self'`. Probado con un `<script>` dentro de una respuesta del agente en Chrome: se muestra inerte. |
@@ -277,7 +282,7 @@ Se separa lo implementado de lo pendiente. Los hallazgos 1–9 salen de las ejec
 | 6 | **Hipótesis del modelo sin respaldo de herramientas.** En sol-004 dijo que el IVA «puede explicar» la diferencia de 6 % entre cotización y solicitud; aritméticamente no cuadra (un 19 % daría una diferencia mayor). La formuló como hipótesis y pidió confirmación al solicitante. Las demás frases con reservas fueron honestas (p. ej. «las herramientas no explican qué significa C1», «esta respuesta no confirma ninguna de las dos rutas»). | Riesgo de prompt, no de seguridad | Reforzar la regla «solo afirmas lo que sale de una herramienta» y evaluar |
 | 7 | **Confirmación innecesaria al reprocesar órdenes ya creadas.** `oc_validar` marca «requiere confirmación» sin comprobar si la OC existe; aparece el panel y, si se confirma, `oc_crear` devuelve la OC existente (idempotente) sin evento de concesión. Comportamiento anterior a B6.1. | Fricción para el usuario | Consultar `buscarOrdenPorReferencia` en `oc_validar` |
 | 8 | **Resistencia a documentos hostiles no medida con el modelo real.** Ningún fixture contiene inyecciones. | Riesgo no cuantificado | Evaluación adversarial |
-| 9 | **Riesgos de despliegue y seguridad** (secciones 17 y 18). Mitigados en código y probados en local: clave de acceso, `TRUST_PROXY` (desactivado), presupuesto global. **Siguen abiertos:** validar la cabecera real de IP en Render, la identidad por usuario (la clave es compartida), el `sessionId` elegido por el cliente, la imagen Docker sin construir y el almacenamiento efímero del plan Free. | Críticos antes de publicar | Pasos manuales de la sección 18.4 |
+| 9 | **Riesgos de despliegue y seguridad** (secciones 17 y 18). Mitigados en código y probados en local: clave de acceso (o, por decisión explícita, demo abierta con límites), `TRUST_PROXY` (desactivado), presupuesto global. **Siguen abiertos:** validar la cabecera real de IP en Render, la identidad por usuario (la clave es compartida), el `sessionId` elegido por el cliente, la imagen Docker sin construir y el almacenamiento efímero del plan Free. | Críticos antes de publicar | Pasos manuales de la sección 18.4 |
 
 **Otras limitaciones conocidas**
 - **Sin identidad por usuario:** el acceso se protege con una clave compartida (`ACCESS_KEY`), pero el confirmante sigue siendo la sesión (`sesion:<id>`); quienes comparten la clave pueden leer o continuar las sesiones de los demás.
@@ -313,8 +318,8 @@ El agente detecta (RC8) las OC cuya factura es anterior a la solicitud, exige co
 | Front, backend, adaptador LLM, prompt separado | Hecho | Ejecutado con Anthropic real en los seis casos (sección 5.2) |
 | Auditoría de confirmaciones (eventos `CONFIRMACION_*`, estados `PENDIENTE_CONFIRMACION`/`RECHAZADA`) | Hecho (B6.1) | Verificada con el modelo real en sol-005 y sol-006; sol-004 es anterior a B6.1 |
 | Módulo reutilizable (bonus) | No hecho | |
-| Preparación del despliegue en Render Free (Dockerfile, `.dockerignore`, `render.yaml`, clave de acceso, `TRUST_PROXY`, presupuesto global) | Hecho y verificado en local | Imagen Docker **no construida** (sin Docker local); ver sección 18 |
-| Link público / despliegue | **No hecho** | Pasos manuales en la sección 18.4 |
+| Preparación del despliegue en Render Free (Dockerfile, `.dockerignore`, `render.yaml`, modo de acceso, `TRUST_PROXY`, presupuesto global) | Hecho; verificado en local y en parte en Render | La imagen se construyó y arrancó en Render (no hay Docker local); ver sección 18 |
+| Link público / despliegue | **Parcial** | Servicio creado en Render Free con la versión protegida por clave; la demo abierta falta subirla y redesplegarla (sección 18.4) |
 
 **Qué falta para producción (pendiente, no implementado):** SAP real, identidad por usuario (hoy hay una clave compartida), validar la IP real detrás del proxy en Render, persistencia con concurrencia, pruebas adversariales con el modelo real, resolver los hallazgos 1–7 de la sección 12, monitoreo, despliegue con TLS y secretos gestionados, política sobre retroactivas, PDF de evidencia/firma si auditoría lo exige.
 
@@ -328,17 +333,17 @@ El agente detecta (RC8) las OC cuya factura es anterior a la solicitud, exige co
 
 ## 17. Riesgos de llevar esto a producción
 
-Estado: **Mitigado en código** (implementado y probado en local, no desplegado), **Pendiente manual** (acción de una persona) o **Aceptado** (limitación asumida para la demostración).
+Estado: **Mitigado en código** (implementado y probado en local), **Pendiente manual** (acción de una persona) o **Aceptado** (limitación asumida para la demostración).
 
 | Riesgo | Mitigación | Estado |
 |---|---|---|
 | Comportamiento del modelo real ante documentos hostiles no medido (hallazgo 8) | Evaluación con casos adversariales antes de abrir al público; mantener el gating en el backend | Pendiente |
 | Prompt injection que logre engañar a *humanos* vía la explicación del agente | El front muestra siempre los datos de las tool calls, no solo la redacción del modelo | Mitigado en código (parcial) |
 | Sin identidad del confirmante | Autenticación (SSO) y registro del usuario real en `confirmado_por`. Hoy es una clave compartida: no distingue usuarios | Pendiente |
-| **Link público sin autenticación: cualquiera podría consumir tokens** | `ACCESS_KEY` obligatoria en producción (≥ 16 caracteres) en `/api/chat` y `/api/sessions/:id`, con pantalla de acceso, comparación en tiempo constante y freno de fuerza bruta | Mitigado en código |
+| **Link público sin autenticación: cualquiera podría consumir tokens** | Modo protegido: `ACCESS_KEY` obligatoria (≥ 16 caracteres), pantalla de acceso, comparación en tiempo constante y freno de fuerza bruta. **Modo abierto (decisión explícita, `ALLOW_OPEN_ACCESS=true`): no hay clave**; el riesgo se acota con el límite de frecuencia, `GLOBAL_TOKEN_BUDGET` y el límite de gasto de Anthropic | Modo protegido: mitigado en código. Modo abierto: **riesgo aceptado** |
 | **Límite por IP detrás de un proxy** (el servidor usaba la IP del socket, que sería la del balanceador) | `TRUST_PROXY` (desactivado por defecto), cabecera y saltos configurables, entradas de la izquierda ignoradas; `/api/diagnostico` para validar. La cabecera real de Render **no está confirmada** | Mitigado en código; validar tras desplegar |
 | **Gasto global de tokens** (el tope de 100.000 era solo por sesión) | `GLOBAL_TOKEN_BUDGET` con reserva atómica; límite de gasto en la consola de Anthropic como protección de fondo | Mitigado en código; configurar el límite del proveedor: pendiente manual |
-| **`sessionId` elegido por el cliente** y sesiones legibles por id | Con `ACCESS_KEY` solo quien tenga la clave accede, pero todos los que la comparten ven todas las sesiones | Aceptado (parcial) |
+| **`sessionId` elegido por el cliente** y sesiones legibles por id | Con `ACCESS_KEY` solo quien tenga la clave accede, pero todos los que la comparten ven todas las sesiones. **En demo abierta, cualquiera que conozca un `sessionId` puede leer esa sesión** | Aceptado (parcial) |
 | **`out/` sin persistencia:** Render Free pierde los datos al reiniciar, redesplegar o suspender | Se acepta para la demostración; advertencia en la UI y `persistencia: "efimera"` en `/api/health`; sin datos sembrados | Aceptado |
 | **Numeración y concurrencia:** la serialización es solo dentro del proceso; con almacenamiento efímero la numeración vuelve a 4500000001 | Una sola instancia (el plan Free no escala) | Aceptado |
 | **Clave de Anthropic expuesta durante las pruebas** (fue compartida en una conversación) | Revocarla, crear una exclusiva con límite de gasto y guardarla solo como secreto de Render | Pendiente manual |
@@ -350,9 +355,9 @@ Estado: **Mitigado en código** (implementado y probado en local, no desplegado)
 | Evidencia sin firma digital | Evaluar PDF firmado o referencia al mensaje original | Pendiente |
 | Datos sensibles en `out/` (sesiones, logs) | Retención acotada, cifrado en reposo y control de acceso | Pendiente |
 
-## 18. Despliegue en Render Free: preparado, no desplegado
+## 18. Despliegue en Render Free
 
-**Estado:** el proyecto está **preparado** para Render Free con Docker y verificado en local, pero **no está desplegado**, **no se subió nada a GitHub** y **la imagen Docker no se construyó** (no hay Docker en la máquina de desarrollo). No hay link público todavía. Las instrucciones paso a paso están en el [README](README.md#despliegue-en-render-free).
+**Estado:** el servicio **ya se creó en Render Free**: Render aceptó el Blueprint, la imagen Docker se construyó y arrancó (sin `ACCESS_KEY` el servidor se negó a iniciar, como se diseñó) y, con la clave, el servicio quedó en línea con la pantalla de acceso. El **modo de demo abierta** (`ALLOW_OPEN_ACCESS=true`, sin clave) está implementado y probado en local, pero **aún no se subió a GitHub ni se redesplegó**: hasta entonces el servicio en línea sigue exigiendo clave. No hay Docker en la máquina de desarrollo. Las instrucciones paso a paso están en el [README](README.md#despliegue-en-render-free).
 
 ### 18.1 Implementado (verificado en local)
 
@@ -361,11 +366,11 @@ Estado: **Mitigado en código** (implementado y probado en local, no desplegado)
 | `Dockerfile` | `oven/bun:1.4.4-slim` en dos etapas; instala solo dependencias de producción con `--frozen-lockfile`; **copia explícita** de `src`, `agent`, `web`, `fixtures`, `package.json` y `tsconfig.json`; usuario no root; `HOST=0.0.0.0`, `PORT=10000`, `EPHEMERAL_STORAGE=true`; sin secretos en `ENV`/`ARG`. |
 | `.dockerignore` | Lista blanca (`*` y reincorporación de lo necesario) más bloqueos explícitos de `.env`, `out/`, `node_modules/` y respaldos. |
 | `render.yaml` | Servicio web Docker, plan `free`, `healthCheckPath: /api/health`, `autoDeployTrigger: "off"` (despliegue manual; entre comillas porque `off` sin ellas es un booleano en YAML), `LLM_API_KEY` y `ACCESS_KEY` con `sync: false`, `TRUST_PROXY=false`, presupuesto global y límite por IP definidos. |
-| Clave de acceso | `ACCESS_KEY` obligatoria con `NODE_ENV=production` (≥ 16 caracteres; el servidor no arranca sin ella ni revela la clave). Protege `/api/chat`, `/api/sessions/:id` y `/api/diagnostico` vía `X-Access-Key`; `/api/health` y estáticos públicos. Tiempo constante; 429 tras 10 fallos por minuto sin bloquear la clave correcta. |
+| Modos de acceso | **Protegido:** `ACCESS_KEY` obligatoria con `NODE_ENV=production` (≥ 16 caracteres; el servidor no arranca sin ella ni revela la clave), en `/api/chat`, `/api/sessions/:id` y `/api/diagnostico` vía `X-Access-Key`; tiempo constante; 429 tras 10 fallos por minuto sin bloquear la clave correcta. **Abierto:** `ALLOW_OPEN_ACCESS=true` (no combinable con `ACCESS_KEY`), con aviso en el log; `/api/health` y estáticos son públicos en ambos modos. `render.yaml` está configurado hoy en modo abierto. |
 | Pantalla de acceso | Valida la clave contra el backend sin gastar tokens; la guarda solo en `sessionStorage`; CSP, escape y envío de texto de confirmación intactos. Advertencia permanente de almacenamiento efímero. |
 | `TRUST_PROXY` | Desactivado por defecto; con `true`, entrada N-ésima desde la derecha de la cabecera configurada, con retorno a la IP del socket si no es válida. `/api/diagnostico` permite validar la estrategia en Render. |
 | `GLOBAL_TOKEN_BUDGET` | Reserva atómica antes de cada llamada al modelo y liquidación posterior (también con fallos); 503 al agotarse; estado en `/api/health`. |
-| Pruebas | 200 en total: las 151 existentes sin modificar y 49 nuevas (configuración, acceso, proxy, presupuesto con concurrencia y guardas estáticas del despliegue). |
+| Pruebas | 207 en total: las 151 existentes sin modificar y 56 nuevas (configuración, acceso, proxy, presupuesto con concurrencia y guardas estáticas del despliegue). |
 
 **Verificación del arranque de producción** (copia con el contenido de la imagen, solo dependencias de producción, `NODE_ENV=production`, `HOST=0.0.0.0`, `PORT=10000`): escucha en `*:10000`; sin clave de acceso no arranca; 401 sin clave y 200 con clave; `/api/health` y estáticos públicos; la clave no aparece en respuestas, logs ni `out/`; el presupuesto contabiliza tokens; una cabecera `X-Forwarded-For` falsificada no cambia la IP efectiva sin `TRUST_PROXY`; pantalla de acceso comprobada en Chrome. El flujo completo del chat se probó apuntando el SDK a un servidor local que imita la API de mensajes (no se llamó a Anthropic).
 
@@ -373,17 +378,20 @@ Estado: **Mitigado en código** (implementado y probado en local, no desplegado)
 
 Sin disco persistente (`out/` se pierde al redesplegar, reiniciar o suspender); suspensión tras 15 minutos sin tráfico con arranque en frío de ≈ 1 minuto; 512 MB de RAM, 0,1 CPU, 750 horas mensuales y una sola instancia; TLS terminado por el balanceador con redirección a HTTPS; despliegue desde repositorio Git o imagen de un registro. Consecuencias aceptadas: la numeración de OC vuelve a 4500000001 y se pierden sesiones, confirmaciones pendientes, control y logs; no se siembran datos.
 
-### 18.3 No verificado
+### 18.3 Verificado en Render y no verificado
 
-- La construcción de la imagen (`docker build`), el usuario `bun` de la variante `-slim` y los permisos de escritura de `out/`.
-- La sintaxis completa de `render.yaml` frente a Render (solo pruebas estáticas y campos documentados).
-- Qué cabecera lleva la IP del cliente en Render, si se conserva `Host` y si `RENDER_EXTERNAL_URL` existe en servicios Docker (el servidor ya la acepta como origen CORS si existe).
+**Verificado en Render** (por los logs de despliegue y la página en línea): el Blueprint fue aceptado, la imagen se construyó (incluido el usuario `bun` y los permisos de `out/`), el contenedor arrancó y el servicio quedó en línea con la pantalla de acceso.
+
+**No verificado:**
+- Qué cabecera lleva la IP del cliente en Render, si se conserva `Host` y si `RENDER_EXTERNAL_URL` existe en servicios Docker (el servidor ya la acepta como origen CORS si existe). Por eso `TRUST_PROXY` sigue desactivado.
 - El arranque en frío real y el rendimiento con 0,1 CPU.
+- La **demo abierta en Render**: solo se probó en local (arranque con aviso, chat sin cabecera, límites activos y combinación inválida con `ACCESS_KEY`).
+- La imagen no se construyó en la máquina de desarrollo (no hay Docker local).
 
 ### 18.4 Pendiente (acciones manuales)
 
 1. Conectar la carpeta al repositorio remoto (previamente puede requerir aceptar la licencia de Xcode) y subir el código, revisando que `.env`, `out/` y `node_modules/` no se versionen. Decidir si el repositorio es público.
-2. Revocar la clave de Anthropic de desarrollo, crear una exclusiva con límite de gasto y generar la `ACCESS_KEY`.
+2. Revocar la clave de Anthropic de desarrollo, crear una exclusiva con límite de gasto y ponerla en `LLM_API_KEY` (y generar `ACCESS_KEY` solo si se usa el modo protegido).
 3. Crear el Blueprint en Render, cargar los dos secretos y desplegar manualmente.
 4. Verificar tras el despliegue (health, 401/200, UI, `/api/diagnostico`), decidir `TRUST_PROXY` con los datos reales y repetir la prueba con una cabecera falsificada; cambiar variables redespliega y borra los datos.
 5. Despertar el servicio antes de la defensa y no redesplegar durante ella.

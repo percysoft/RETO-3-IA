@@ -4,7 +4,7 @@ Reto técnico 03 · Perxia 2.0. Un agente que lee el paquete de una compra (corr
 
 > Principio de diseño: **el modelo de lenguaje conversa; el backend decide.** Las reglas de control, el payload, la numeración y la autorización de crear una OC viven en código determinístico (`src/core`), independiente de cualquier LLM. El modelo solo opera herramientas tipadas y explica sus resultados.
 
-Más detalle para evaluación en [SOLUCION.md](SOLUCION.md). Supuestos de interpretación del PRD en [docs/supuestos-b1.md](docs/supuestos-b1.md).
+Más detalle para evaluación en [SOLUCION.md](SOLUCION.md); resumen de cierre, resultados reales y mejoras futuras en [docs/INFORME.md](docs/INFORME.md). Supuestos de interpretación del PRD en [docs/supuestos-b1.md](docs/supuestos-b1.md).
 
 ## Estado
 
@@ -12,17 +12,17 @@ Más detalle para evaluación en [SOLUCION.md](SOLUCION.md). Supuestos de interp
 
 | Pieza | Estado |
 |---|---|
-| Core RC1–RC10, payload, evidencia TXT + SHA-256, idempotencia, `control.csv` | Hecho; 200 pruebas automáticas en total (el proyecto completo) |
+| Core RC1–RC10, payload, evidencia TXT + SHA-256, idempotencia, `control.csv` | Hecho; 207 pruebas automáticas en total (el proyecto completo) |
 | SAP simulado (`out/sap/ordenes.jsonl`, numeración desde 4500000001) | Hecho |
 | Herramientas `oc_*` con Zod | Hecho |
 | Agente con Anthropic (ciclo, límites, sesiones, log) | Hecho; **ejecutado con Anthropic real en los seis casos de aceptación** (ver más abajo) |
 | Servidor HTTP + front web | Hecho; usado con el modelo real desde Chrome en sol-002 a sol-006 (botones de proceso y de confirmación) |
 | Auditoría de confirmaciones (eventos en `log.jsonl`, estados en `control.csv`) | Hecho (B6.1) |
 | `demo.ts` sin LLM | Hecho |
-| Seguridad para link público: `ACCESS_KEY` obligatoria en producción, pantalla de acceso, `TRUST_PROXY` (desactivado), `GLOBAL_TOKEN_BUDGET` | Hecho y probado en local (200 pruebas) |
+| Seguridad para link público: clave de acceso (`ACCESS_KEY`, opcional con `ALLOW_OPEN_ACCESS=true`), pantalla de acceso, `TRUST_PROXY` (desactivado), `GLOBAL_TOKEN_BUDGET` | Hecho y probado en local (207 pruebas) |
 | `Dockerfile`, `.dockerignore`, `render.yaml` | Escritos y validados con pruebas estáticas; **imagen no construida** |
 
-**Preparado pero no desplegado:** despliegue en Render Free (Dockerfile, `render.yaml`, clave de acceso, presupuesto global de tokens y configuración de proxy). Verificado en local; **la imagen Docker no se construyó** (no hay Docker local) y no hay link público todavía. Ver [Despliegue en Render Free](#despliegue-en-render-free).
+**Preparado pero no desplegado en su versión final:** despliegue en Render Free (Dockerfile, `render.yaml`, modo de acceso, presupuesto global de tokens y configuración de proxy; el servicio se creó en Render con la versión protegida por clave y esta versión lo pasa a demo abierta). Verificado en local; **la imagen Docker no se construyó** (no hay Docker local) y no hay link público todavía. Ver [Despliegue en Render Free](#despliegue-en-render-free).
 
 **Pendiente** (no implementado): link público, PDF de evidencia (P1), `oc_leer_excel` (P1), módulo reutilizable (bonus), streaming, SAP real, identidad por usuario. Las mejoras derivadas de las pruebas reales están en [Limitaciones conocidas](#limitaciones-conocidas).
 
@@ -46,6 +46,10 @@ Consumo **medido** (tokens de entrada + salida + caché que reporta el proveedor
 > **Desviación en sol-005:** esa ejecución se hizo en una sesión **reutilizada** (`47b9741e…`, que ya traía 9.307 tokens y dos llamadas de la prueba de idempotencia de sol-004) por un error en la preparación del navegador. El resultado funcional fue válido, pero **no cumplió el requisito de «sesión nueva»**. Detalle en [SOLUCION.md §5.4](SOLUCION.md).
 
 ## Arquitectura
+
+![Arquitectura del sistema](docs/arquitectura.png)
+
+(Diagrama editable en [docs/arquitectura.svg](docs/arquitectura.svg).) Versión en texto:
 
 ```
 Navegador (web/)  ──HTTP──▶  src/server.ts  ──▶  src/agente/ (ciclo del agente)
@@ -111,8 +115,9 @@ Copie `.env.example` a `.env` (Bun lo carga solo; `.env` está en `.gitignore`).
 | `MAX_ITERACIONES` | `25` | Tope de iteraciones herramienta→modelo por turno. |
 | `MAX_TOKENS_SESION` | `100000` | Tope de tokens (entrada + salida) por sesión. |
 | `LLM_TIMEOUT_MS` | `60000` | Timeout por llamada al proveedor. |
-| `NODE_ENV` | vacío | Con `production`, `ACCESS_KEY` es obligatoria y el servidor no arranca sin ella. |
-| `ACCESS_KEY` | — | Clave de acceso compartida (≥ 16 caracteres) para `/api/chat`, `/api/sessions/:id` y `/api/diagnostico`, enviada en la cabecera `X-Access-Key`. Sin ella (y fuera de producción) el acceso es abierto. `/api/health` y los estáticos son siempre públicos. |
+| `NODE_ENV` | vacío | Con `production`, `ACCESS_KEY` es obligatoria (salvo `ALLOW_OPEN_ACCESS=true`) y el servidor no arranca sin ella. |
+| `ALLOW_OPEN_ACCESS` | `false` | `true` permite `NODE_ENV=production` **sin clave de acceso** (demo pública abierta): cualquiera con el enlace puede usar el agente y consumir la clave de IA, acotado por `RATE_LIMIT_CHAT_PER_MIN` y `GLOBAL_TOKEN_BUDGET`. Se avisa en el log al arrancar. No puede combinarse con `ACCESS_KEY`. Es la configuración actual de `render.yaml`. |
+| `ACCESS_KEY` | — | Clave de acceso compartida (≥ 16 caracteres) para `/api/chat`, `/api/sessions/:id` y `/api/diagnostico`, enviada en la cabecera `X-Access-Key`. Sin ella, el acceso es abierto (fuera de producción, o con `ALLOW_OPEN_ACCESS=true`). `/api/health` y los estáticos son siempre públicos. |
 | `TRUST_PROXY` | `false` | `true`/`false`. Si es `true`, la IP del cliente se toma de `TRUST_PROXY_HEADER`; por defecto no se confía en ninguna cabecera. |
 | `TRUST_PROXY_HEADER` | `x-forwarded-for` | Cabecera con la cadena de IPs (solo con `TRUST_PROXY=true`). |
 | `TRUST_PROXY_HOPS` | `1` | Proxies de confianza, contados desde la derecha de la cadena. |
@@ -124,7 +129,7 @@ Copie `.env.example` a `.env` (Bun lo carga solo; `.env` está en `.gitignore`).
 ```bash
 bun run demo         # 6 casos + idempotencia, SIN LLM ni clave
 bun run dev          # servidor + front en http://127.0.0.1:3000  (igual que `bun run start`)
-bun test             # 200 pruebas, sin red ni clave
+bun test             # 207 pruebas, sin red ni clave
 bun run typecheck    # tsc --noEmit
 ```
 
@@ -188,7 +193,7 @@ En las pruebas reales, sol-005 y sol-006 muestran el ciclo completo (`PENDIENTE_
 | `POST` | `/api/chat` | Envía un mensaje al agente (requiere `X-Access-Key` si hay `ACCESS_KEY`). |
 | `GET` | `/api/sessions/:id` | Historial y estado de una sesión (requiere `X-Access-Key` si hay `ACCESS_KEY`). |
 | `GET` | `/api/health` | Estado del servidor, de la IA, acceso, persistencia y presupuesto. **Público.** |
-| `GET` | `/api/diagnostico` | Cabeceras de proxy y IP efectiva, para validar `TRUST_PROXY`. Solo existe con `ACCESS_KEY` y la exige. |
+| `GET` | `/api/diagnostico` | Cabeceras de proxy y IP efectiva, para validar `TRUST_PROXY`. Solo existe con `ACCESS_KEY` (no en modo abierto) y la exige. |
 | `GET` | `/`, `/app.js`, `/styles.css` | Front (lista cerrada de archivos de `web/`). |
 
 ### `POST /api/chat`
@@ -253,7 +258,7 @@ Errores: `{ "ok": false, "error": "…" }` (en chat, además `reply`, `toolCalls
   "acceso": "abierto", "persistencia": "local" }
 ```
 
-`acceso` es `"protegido"` con `ACCESS_KEY`; `persistencia` es `"efimera"` con `EPHEMERAL_STORAGE=true`; con `GLOBAL_TOKEN_BUDGET` se añade `presupuesto: {limite, consumido, reservado, disponible}`.
+`acceso` es `"protegido"` con `ACCESS_KEY` y `"abierto"` sin ella; `persistencia` es `"efimera"` con `EPHEMERAL_STORAGE=true`; con `GLOBAL_TOKEN_BUDGET` se añade `presupuesto: {limite, consumido, reservado, disponible}`.
 
 Sin clave, `/api/health` responde así y `/api/chat` responde 503; el servidor no se detiene.
 
@@ -286,7 +291,7 @@ Hallazgos de las pruebas reales y de la auditoría final (B7). Ninguno impide cr
 
 ## Despliegue en Render Free
 
-Estado: **preparado, no desplegado.** Se añadieron `Dockerfile`, `.dockerignore`, `render.yaml`, clave de acceso, presupuesto global de tokens y configuración de proxy. Se verificó localmente el arranque de producción (sección «Qué se verificó y qué no»), pero **la imagen Docker no se construyó** porque no hay Docker en la máquina de desarrollo.
+Estado: el servicio **ya se creó en Render Free**, la imagen Docker se construyó y se ejecutó allí, y la versión desplegada hasta ahora exige clave de acceso. El **modo de demo abierta** descrito abajo (`ALLOW_OPEN_ACCESS`) está implementado y probado en local, pero **aún no se ha subido a GitHub ni redesplegado**: hasta entonces el servicio en línea sigue pidiendo clave. No hay datos persistentes (ver limitaciones).
 
 ### Limitaciones reales del plan Free (según la documentación de Render)
 
@@ -300,16 +305,22 @@ Estado: **preparado, no desplegado.** Se añadieron `Dockerfile`, `.dockerignore
 
 | Control | Cómo funciona |
 |---|---|
-| **Clave de acceso (`ACCESS_KEY`)** | Obligatoria con `NODE_ENV=production` (el servidor no arranca sin ella), mínimo 16 caracteres, validada en el backend. Protege `/api/chat`, `/api/sessions/:id` y `/api/diagnostico` mediante la cabecera `X-Access-Key`. `/api/health` y los archivos estáticos siguen públicos. Comparación en tiempo constante (SHA-256 + `timingSafeEqual`). Tras 10 fallos por minuto desde una IP se responde 429 (la clave correcta nunca se bloquea). |
-| **Pantalla de acceso (front)** | Pide la clave, la valida contra el backend sin gastar tokens y la guarda solo en `sessionStorage` (se borra al cerrar la pestaña); viaja únicamente en la cabecera. CSP, escape de HTML y el envío exclusivo de texto de confirmación no cambian. |
+| **Clave de acceso (`ACCESS_KEY`)** — *modo protegido* | Obligatoria con `NODE_ENV=production` salvo que se active `ALLOW_OPEN_ACCESS=true` (el servidor no arranca sin ella), mínimo 16 caracteres, validada en el backend. Protege `/api/chat`, `/api/sessions/:id` y `/api/diagnostico` mediante la cabecera `X-Access-Key`. `/api/health` y los archivos estáticos siguen públicos. Comparación en tiempo constante (SHA-256 + `timingSafeEqual`). Tras 10 fallos por minuto desde una IP se responde 429 (la clave correcta nunca se bloquea). |
+| **Demo abierta (`ALLOW_OPEN_ACCESS=true`)** — *configuración actual de `render.yaml`* | Decisión explícita: no hay clave ni pantalla de acceso; cualquiera con el enlace puede usar el agente y **consumir la clave de IA**. Se avisa en el log al arrancar, no puede combinarse con `ACCESS_KEY` y `/api/diagnostico` no existe. Lo acotan solo `RATE_LIMIT_CHAT_PER_MIN` (hoy **compartido por todos los usuarios**, porque con `TRUST_PROXY=false` el servidor ve la IP del balanceador), `GLOBAL_TOKEN_BUDGET` y el límite de gasto de la consola de Anthropic. |
+| **Pantalla de acceso (front)** — *modo protegido* | Pide la clave, la valida contra el backend sin gastar tokens y la guarda solo en `sessionStorage` (se borra al cerrar la pestaña); viaja únicamente en la cabecera. CSP, escape de HTML y el envío exclusivo de texto de confirmación no cambian. |
 | **`TRUST_PROXY` (desactivado)** | Por defecto el servidor ignora toda cabecera de proxy y usa la IP del socket. Con `TRUST_PROXY=true` toma la entrada N-ésima **desde la derecha** de `TRUST_PROXY_HEADER` (`TRUST_PROXY_HOPS`); las entradas de la izquierda (falsificables) se ignoran y, si falta o no es una IP válida, vuelve a la IP del socket. |
 | **`GLOBAL_TOKEN_BUDGET`** | Tope de tokens del proceso (todas las sesiones) con reserva atómica antes de cada llamada al modelo, de modo que llamadas concurrentes no lo superen. Se reinicia con el proceso. Al agotarse, `/api/chat` responde 503. |
 | **Límite del proveedor** | Configure además un límite de gasto en la consola de Anthropic: es la protección de fondo. |
 
+### Modos de acceso
+
+- **Demo abierta (actual en `render.yaml`):** `ALLOW_OPEN_ACCESS=true`; el único secreto es `LLM_API_KEY`. Útil para que cualquiera pruebe el link, a costa de exponer la clave de IA a un uso libre dentro de los límites. Reduzca `GLOBAL_TOKEN_BUDGET` a lo que esté dispuesto a gastar y confirme el límite de gasto en Anthropic.
+- **Protegido:** quite `ALLOW_OPEN_ACCESS` (en `render.yaml` y en el panel) y defina `ACCESS_KEY` como secreto (`sync: false`, mínimo 16 caracteres; `openssl rand -base64 24`). Entonces el front pide la clave y `/api/diagnostico` queda disponible.
+
 ### Pasos para desplegar
 
 1. **Clave de Anthropic.** Revoque la clave usada durante el desarrollo y cree una exclusiva con límite de gasto.
-2. **`ACCESS_KEY`.** Genere una clave de acceso: `openssl rand -base64 24`. Se entrega por separado a quien deba probar el link.
+2. **`ACCESS_KEY`** (solo en modo protegido). Genere una clave de acceso: `openssl rand -base64 24`. Se entrega por separado a quien deba probar el link. En demo abierta no hace falta.
 3. **Repositorio Git.** Con `git` operativo (en macOS puede requerir aceptar la licencia de Xcode: `sudo xcodebuild -license`), desde la carpeta del proyecto y sin sobrescribir nada:
    ```bash
    git init -b main
@@ -324,34 +335,36 @@ Estado: **preparado, no desplegado.** Se añadieron `Dockerfile`, `.dockerignore
    git push -u origin main               # sin --force
    ```
    Si el remoto ya tuviera commits, en lugar de `git push` directo use `git reset --mixed origin/main` (mueve HEAD sin tocar sus archivos) antes del commit para conservar su historial. **El repositorio puede ser público: no suba `.env` ni claves, y confirme que puede publicar los materiales del reto (PRD y fixtures).**
-4. **Render.** *New → Blueprint*, conecte el repositorio y Render detectará `render.yaml` (servicio web Docker, plan `free`, health check `/api/health`, despliegue **manual**). Cuando lo solicite, introduzca `LLM_API_KEY` y `ACCESS_KEY` (están declaradas con `sync: false`: nunca viajan en el repositorio). Lance el despliegue con *Manual Deploy*. (El YAML se validó solo por lectura y con pruebas estáticas; Render lo valida al crear el Blueprint. Alternativa: crear el servicio a mano con *Language: Docker* y las mismas variables.)
+4. **Render.** *New → Blueprint*, conecte el repositorio y Render detectará `render.yaml` (servicio web Docker, plan `free`, health check `/api/health`, despliegue **manual**). Cuando lo solicite, introduzca `LLM_API_KEY` (declarada con `sync: false`: nunca viaja en el repositorio) y, solo en modo protegido, `ACCESS_KEY` como variable secreta adicional. Lance el despliegue con *Manual Deploy*. (El YAML se validó solo por lectura y con pruebas estáticas; Render lo valida al crear el Blueprint. Alternativa: crear el servicio a mano con *Language: Docker* y las mismas variables.)
 5. **Verificación posterior** (con la URL pública `https://<servicio>.onrender.com`):
-   - `GET /api/health` → 200, `acceso: "protegido"`, `persistencia: "efimera"`.
-   - `POST /api/chat` sin cabecera `X-Access-Key` → 401; con la clave correcta → 200.
-   - Abrir la URL en el navegador: aparece la pantalla de acceso y, tras la clave, el chat funciona (si apareciera un 403 de «Origen no permitido», el control de mismo origen no recibe el `Host` esperado: revise `CORS_ORIGINS`).
-   - **Validar el proxy:** `curl -H "X-Access-Key: $ACCESS_KEY" https://<servicio>.onrender.com/api/diagnostico` muestra `ipSocket` (hoy será la IP del balanceador, compartida por todos), las cabeceras de proxy recibidas y `urlRecibida`. Repita enviando `-H "X-Forwarded-For: 6.6.6.6"` y compare: la documentación de Render consultada **no confirma** qué cabecera lleva la IP del cliente, así que no active `TRUST_PROXY` hasta ver, en esa respuesta, la cabecera y el número de saltos reales. Luego defina `TRUST_PROXY=true`, `TRUST_PROXY_HEADER` y `TRUST_PROXY_HOPS` en el panel y repita la prueba con una cabecera falsificada. Cambiar variables redespliega y borra los datos: hágalo antes de la demostración.
+   - `GET /api/health` → 200, `persistencia: "efimera"` y `acceso: "abierto"` (demo abierta) o `"protegido"` (con `ACCESS_KEY`).
+   - Demo abierta: `POST /api/chat` sin cabecera → 200. Modo protegido: sin cabecera `X-Access-Key` → 401 y con la clave correcta → 200.
+   - Abrir la URL en el navegador: en modo protegido aparece la pantalla de acceso y, tras la clave, el chat funciona; en demo abierta entra directo al chat (si apareciera un 403 de «Origen no permitido», el control de mismo origen no recibe el `Host` esperado: revise `CORS_ORIGINS`).
+   - **Validar el proxy** (solo modo protegido; en demo abierta `/api/diagnostico` no existe): `curl -H "X-Access-Key: $ACCESS_KEY" https://<servicio>.onrender.com/api/diagnostico` muestra `ipSocket` (hoy será la IP del balanceador, compartida por todos), las cabeceras de proxy recibidas y `urlRecibida`. Repita enviando `-H "X-Forwarded-For: 6.6.6.6"` y compare: la documentación de Render consultada **no confirma** qué cabecera lleva la IP del cliente, así que no active `TRUST_PROXY` hasta ver, en esa respuesta, la cabecera y el número de saltos reales. Luego defina `TRUST_PROXY=true`, `TRUST_PROXY_HEADER` y `TRUST_PROXY_HOPS` en el panel y repita la prueba con una cabecera falsificada. Cambiar variables redespliega y borra los datos: hágalo antes de la demostración.
 
 ### Qué se verificó y qué no
 
 Verificado en local (sin llamadas a Anthropic):
-- `bun run typecheck` y `bun test` (200 pruebas: las 151 existentes sin cambios y 49 nuevas).
+- `bun run typecheck` y `bun test` (207 pruebas: las 151 existentes sin cambios y 56 nuevas).
 - Arranque de producción con una copia con **el mismo contenido que la imagen** (solo `src`, `agent`, `web`, `fixtures`, `package.json`, `tsconfig.json` y dependencias de producción instaladas con `--frozen-lockfile --production`), con `NODE_ENV=production`, `HOST=0.0.0.0` y `PORT=10000`: escucha en `*:10000`.
-- Sin `ACCESS_KEY` (o con una de menos de 16 caracteres) en producción el servidor **no arranca** y el error no revela la clave; un `HOST` vacío tampoco arranca.
+- Sin `ACCESS_KEY` (o con una de menos de 16 caracteres) en producción, y sin `ALLOW_OPEN_ACCESS=true`, el servidor **no arranca** y el error no revela la clave; un `HOST` vacío tampoco arranca.
 - 401 sin clave o con clave incorrecta en `/api/chat`, `/api/sessions/:id` y `/api/diagnostico`; 200 con la clave correcta; `/api/health` y los estáticos públicos; la clave no aparece en respuestas, logs ni `out/`.
 - Presupuesto global contabilizando los tokens y límite por IP activos; una cabecera `X-Forwarded-For` falsificada no cambia la IP efectiva con `TRUST_PROXY=false`.
 - Pantalla de acceso en Chrome: clave incorrecta → mensaje y sigue bloqueado; clave correcta → el chat funciona; la clave queda solo en `sessionStorage`; una clave guardada inválida vuelve a pedirse.
+- **Demo abierta** (`NODE_ENV=production`, `ALLOW_OPEN_ACCESS=true`, sin clave): arranca con un aviso explícito en el log; `/api/chat` y `/api/sessions/:id` responden sin cabecera; `/api/health` declara `acceso: "abierto"`; `/api/diagnostico` no existe; el límite de frecuencia y el presupuesto global siguen activos; combinarla con `ACCESS_KEY` impide arrancar; la pantalla de acceso no aparece en Chrome.
 - Para probar el flujo completo del chat sin consumir la API real, el servidor de producción simulado apuntó el SDK a un servidor local que imita la API de mensajes.
 
-**No pudo verificarse** (no hay Docker local y no se desplegó):
-- Que la imagen **se construya** y arranque (`docker build`), incluido el usuario `bun` de la imagen `oven/bun:1.4.4-slim` (la guía oficial de Bun usa `USER bun`, pero no se inspeccionó la variante `-slim`) y los permisos de escritura de `out/`.
-- La sintaxis completa de `render.yaml` frente a Render (se comprobó con pruebas estáticas y los campos documentados).
-- Qué cabecera lleva la IP del cliente en Render, si se conserva `Host` y si `RENDER_EXTERNAL_URL` está disponible en servicios Docker (el servidor ya la admite como origen CORS si existe).
+**Verificado en Render** (a partir de los logs y de la página en línea): Render aceptó el Blueprint (`render.yaml`), la imagen Docker se construyó (incluido el usuario `bun`) y el contenedor arrancó; sin `ACCESS_KEY` el servidor se negó a iniciar, tal como se diseñó, y con ella el servicio quedó en línea con la pantalla de acceso. No hay Docker local, así que la imagen no se construyó en la máquina de desarrollo.
+
+**Sigue sin verificarse:**
+- Qué cabecera lleva la IP del cliente en Render, si se conserva `Host` y si `RENDER_EXTERNAL_URL` está disponible en servicios Docker (el servidor ya la admite como origen CORS si existe). Por eso `TRUST_PROXY` sigue desactivado.
 - El arranque en frío real (≈ 1 minuto según Render) y el comportamiento con 512 MB / 0,1 CPU.
+- La demo abierta **en Render**: solo se probó en local; falta subir el cambio y redesplegar.
 
 ### Pasos manuales pendientes
 
 1. Aceptar la licencia de Xcode y conectar la carpeta al repositorio remoto (paso 3).
-2. Revocar la clave de Anthropic de desarrollo, crear la nueva y generar `ACCESS_KEY`.
+2. Revocar la clave de Anthropic de desarrollo y poner la nueva en `LLM_API_KEY` (y, en modo protegido, generar `ACCESS_KEY`).
 3. Crear el Blueprint en Render, cargar los dos secretos y desplegar manualmente.
 4. Ejecutar la verificación posterior, validar el proxy con `/api/diagnostico` y decidir `TRUST_PROXY`.
 5. Despertar el servicio antes de la defensa y no redesplegar durante ella.

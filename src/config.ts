@@ -37,6 +37,12 @@ const EntornoSchema = z.object({
   RATE_LIMIT_CHAT_PER_MIN: LimitePorMinuto,
   /** Clave de acceso compartida para /api/chat y /api/sessions/:id. Obligatoria en producción. */
   ACCESS_KEY: z.string().optional(),
+  /**
+   * Permite NODE_ENV=production SIN clave de acceso (demo pública). Es una decisión explícita: cualquiera con
+   * el enlace puede usar la clave de IA, acotado solo por los límites (frecuencia y presupuesto global).
+   * No puede combinarse con ACCESS_KEY.
+   */
+  ALLOW_OPEN_ACCESS: Booleano,
   /** Confiar en una cabecera de proxy para la IP del cliente. Desactivado por defecto. */
   TRUST_PROXY: Booleano,
   /** Cabecera que lleva la cadena de IPs (solo se usa con TRUST_PROXY=true). */
@@ -58,16 +64,20 @@ export type Config = Omit<Bruta, "ACCESS_KEY"> & { ACCESS_KEY: string | undefine
 
 /**
  * Lee la configuración no secreta. La clave del LLM se lee solo en el adaptador, nunca aquí.
- * ACCESS_KEY: en producción (NODE_ENV=production) es obligatoria y de ≥ 16 caracteres; fuera de
- * producción puede omitirse (o dejarse vacía) y entonces el acceso queda abierto. Si se informa,
- * debe cumplir el mínimo. Los mensajes de error nunca incluyen el valor.
+ * ACCESS_KEY: en producción (NODE_ENV=production) es obligatoria y de ≥ 16 caracteres, salvo que se active
+ * explícitamente ALLOW_OPEN_ACCESS=true (demo pública sin clave). Fuera de producción puede omitirse (o dejarse
+ * vacía) y entonces el acceso queda abierto. Si se informa, debe cumplir el mínimo y no puede combinarse con
+ * ALLOW_OPEN_ACCESS. Los mensajes de error nunca incluyen el valor.
  */
 export function cargarConfig(env: Record<string, string | undefined> = process.env): Config {
   const base = EntornoSchema.parse(env)
   const clave = (base.ACCESS_KEY ?? "").trim()
   const produccion = base.NODE_ENV === "production"
-  if (produccion && clave === "") {
-    throw new Error(`ACCESS_KEY es obligatoria en producción (NODE_ENV=production) y debe tener al menos ${ACCESS_KEY_MIN} caracteres.`)
+  if (base.ALLOW_OPEN_ACCESS && clave !== "") {
+    throw new Error("ALLOW_OPEN_ACCESS=true no puede combinarse con ACCESS_KEY: defina solo una de las dos.")
+  }
+  if (produccion && clave === "" && !base.ALLOW_OPEN_ACCESS) {
+    throw new Error(`ACCESS_KEY es obligatoria en producción (NODE_ENV=production) y debe tener al menos ${ACCESS_KEY_MIN} caracteres (o active ALLOW_OPEN_ACCESS=true para una demo pública sin clave).`)
   }
   if (clave !== "" && clave.length < ACCESS_KEY_MIN) {
     throw new Error(`ACCESS_KEY debe tener al menos ${ACCESS_KEY_MIN} caracteres.`)

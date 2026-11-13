@@ -10,11 +10,14 @@ services:
     # Entre comillas: sin ellas YAML interpreta off como booleano false. Cada despliegue borra out/.
     autoDeployTrigger: "off"
     envVars:
-      # Secretos: se piden en el panel de Render y NO se sincronizan desde este archivo.
+      # Secreto: se pide en el panel de Render y NO se sincroniza desde este archivo.
       - key: LLM_API_KEY
         sync: false
-      - key: ACCESS_KEY
-        sync: false
+      # Demo pública SIN clave de acceso: decisión explícita (cualquiera con el enlace puede usar la clave de IA,
+      # acotado por RATE_LIMIT_CHAT_PER_MIN y GLOBAL_TOKEN_BUDGET). Para volver a exigir clave: quitar esta variable
+      # y definir ACCESS_KEY como secreto (sync: false).
+      - key: ALLOW_OPEN_ACCESS
+        value: "true"
       # No secretos.
       - key: NODE_ENV
         value: production

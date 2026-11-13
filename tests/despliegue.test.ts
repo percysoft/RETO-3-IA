@@ -58,9 +58,11 @@ describe("render.yaml", () => {
     expect(y).toMatch(/healthCheckPath:\s*\/api\/health/)
     expect(y).toMatch(/autoDeployTrigger:\s*"off"/)
   })
-  test("LLM_API_KEY y ACCESS_KEY son secretos no sincronizados y sin valor en el archivo", async () => {
+  test("LLM_API_KEY es un secreto no sincronizado y sin valor; ACCESS_KEY nunca lleva valor en el archivo", async () => {
     const y = await leer("render.yaml")
-    for (const k of ["LLM_API_KEY", "ACCESS_KEY"]) {
+    expect(y).toMatch(/- key: ALLOW_OPEN_ACCESS\n\s+value: "true"/) // demo pública sin clave (decisión explícita)
+    expect(y).not.toMatch(/- key: ACCESS_KEY\n\s+value:/)
+    for (const k of ["LLM_API_KEY"]) {
       const bloque = new RegExp(`- key: ${k}\\n\\s+sync: false\\n`)
       expect(y).toMatch(bloque)
       expect(y).not.toMatch(new RegExp(`- key: ${k}\\n\\s+value:`))

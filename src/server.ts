@@ -327,6 +327,9 @@ export async function iniciarServidor(env: Record<string, string | undefined> = 
     ...(secreto ? { secreto } : {}),
     ...(sinAgente ? { motivoSinAgente: agente.message } : {}),
   })
+  if (config.NODE_ENV === "production" && !config.ACCESS_KEY) {
+    console.warn(`⚠ ACCESO ABIERTO (ALLOW_OPEN_ACCESS=true): cualquiera con el enlace puede usar el agente y consumir la clave de IA. Límites activos: ${config.RATE_LIMIT_CHAT_PER_MIN} mensajes/min por IP y presupuesto global ${presupuesto ? presupuesto.limite : "SIN TOPE"} tokens.`)
+  }
   const servidor = Bun.serve({
     port: config.PORT,
     hostname: config.HOST,

@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1040" width="1600" height="1040" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+<defs><marker id="p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="context-stroke"/></marker><marker id="p0" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M10 0 L0 5 L10 10 z" fill="context-stroke"/></marker></defs>
+<rect width="1600" height="1040" fill="#ffffff"/>
+<text x="40" y="48" font-size="28" font-weight="800" fill="#1c2430">Agente conversacional de Órdenes de Compra SAP — Arquitectura</text>
+<text x="40" y="76" font-size="15" fill="#5b6675">Reto 3 · Periferia IT Group · Bun + TypeScript · Anthropic (Claude) · SAP simulado · desplegado en Render Free (Docker)</text>
+<rect x="40" y="190" width="230" height="300" rx="10" fill="#eaf0ff" stroke="#1f5eff" stroke-width="1.6"/>
+<text x="54" y="214" font-size="16" font-weight="700" fill="#1f5eff">Navegador</text>
+<text x="54" y="237" font-size="13" fill="#1c2430">web/ · HTML + CSS + JS,</text>
+<text x="54" y="256" font-size="13" fill="#1c2430">sin frameworks ni build</text>
+<text x="54" y="275" font-size="13" fill="#1c2430"></text>
+<text x="54" y="294" font-size="13" fill="#1c2430">• Chat y tool calls visibles</text>
+<text x="54" y="313" font-size="13" fill="#1c2430">• Panel de confirmación humana</text>
+<text x="54" y="332" font-size="13" fill="#1c2430">  (Confirmo / No confirmo)</text>
+<text x="54" y="351" font-size="13" fill="#1c2430">• Aviso de datos efímeros</text>
+<text x="54" y="370" font-size="13" fill="#1c2430">• Pantalla de acceso *</text>
+<rect x="300" y="100" width="1000" height="860" rx="16" fill="#fafbfd" stroke="#c9d1dd" stroke-width="2" stroke-dasharray="8 6"/>
+<text x="322" y="128" font-size="16" font-weight="700" fill="#5b6675">Render Free · contenedor Docker (oven/bun 1.4.4-slim, usuario no root) · una instancia · TLS en el balanceador</text>
+<rect x="325" y="145" width="950" height="120" rx="10" fill="#eaf0ff" stroke="#1f5eff" stroke-width="1.6"/>
+<text x="339" y="169" font-size="16" font-weight="700" fill="#1f5eff">src/server.ts — API HTTP y archivos estáticos</text>
+<rect x="339" y="178" width="130" height="26" rx="13" fill="#ffffff" stroke="#1f5eff" stroke-width="1"/>
+<text x="404" y="195.5" font-size="12" text-anchor="middle" fill="#1f5eff">POST /api/chat</text>
+<rect x="477" y="178" width="170" height="26" rx="13" fill="#ffffff" stroke="#1f5eff" stroke-width="1"/>
+<text x="562" y="195.5" font-size="12" text-anchor="middle" fill="#1f5eff">GET /api/sessions/:id</text>
+<rect x="655" y="178" width="190" height="26" rx="13" fill="#ffffff" stroke="#1f5eff" stroke-width="1"/>
+<text x="750" y="195.5" font-size="12" text-anchor="middle" fill="#1f5eff">GET /api/health (público)</text>
+<rect x="853" y="178" width="170" height="26" rx="13" fill="#ffffff" stroke="#1f5eff" stroke-width="1"/>
+<text x="938" y="195.5" font-size="12" text-anchor="middle" fill="#1f5eff">GET /api/diagnostico *</text>
+<text x="339" y="238" font-size="13" fill="#1c2430">CORS restrictivo · validación Zod estricta · CSP · límite por IP · X-Access-Key * · presupuesto global de tokens · estáticos de web/</text>
+<rect x="325" y="305" width="480" height="150" rx="10" fill="#f0eafd" stroke="#6b3fd4" stroke-width="1.6"/>
+<text x="339" y="329" font-size="16" font-weight="700" fill="#6b3fd4">src/agente/ — Ciclo del agente</text>
+<text x="339" y="352" font-size="13" fill="#1c2430">≤ 25 iteraciones · timeout · tope de tokens por sesión</text>
+<text x="339" y="371" font-size="13" fill="#1c2430">Argumentos validados con Zod antes de ejecutar</text>
+<text x="339" y="390" font-size="13" fill="#1c2430">Sesiones (memoria + out/sessions) · un turno a la vez</text>
+<text x="339" y="409" font-size="13" fill="#1c2430">Confirmación humana decidida por el BACKEND</text>
+<text x="339" y="428" font-size="13" fill="#1c2430">Prompt: agent/prompt.md · Conocimiento: src/knowledge/</text>
+<rect x="835" y="305" width="440" height="150" rx="10" fill="#f0eafd" stroke="#6b3fd4" stroke-width="1.6"/>
+<text x="849" y="329" font-size="16" font-weight="700" fill="#6b3fd4">src/llm/ — Adaptador de proveedor</text>
+<text x="849" y="352" font-size="13" fill="#1c2430">LlmAdapter (interfaz neutral)</text>
+<text x="849" y="371" font-size="13" fill="#1c2430">AnthropicAdapter · SDK oficial</text>
+<text x="849" y="390" font-size="13" fill="#1c2430">tool_choice: auto · reintento acotado</text>
+<text x="849" y="409" font-size="13" fill="#1c2430">Errores mapeados · la clave nunca sale del backend</text>
+<rect x="325" y="495" width="950" height="100" rx="10" fill="#e6f6ec" stroke="#17803d" stroke-width="1.6"/>
+<text x="339" y="519" font-size="16" font-weight="700" fill="#17803d">src/tools/oc.ts — 5 herramientas tipadas (Zod, lista cerrada)</text>
+<rect x="339" y="528" width="150" height="26" rx="13" fill="#ffffff" stroke="#17803d" stroke-width="1"/>
+<text x="414" y="545.5" font-size="12" text-anchor="middle" fill="#17803d">oc_leer_paquete</text>
+<rect x="497" y="528" width="120" height="26" rx="13" fill="#ffffff" stroke="#17803d" stroke-width="1"/>
+<text x="557" y="545.5" font-size="12" text-anchor="middle" fill="#17803d">oc_validar</text>
+<rect x="625" y="528" width="170" height="26" rx="13" fill="#ffffff" stroke="#17803d" stroke-width="1"/>
+<text x="710" y="545.5" font-size="12" text-anchor="middle" fill="#17803d">oc_generar_evidencia</text>
+<rect x="803" y="528" width="170" height="26" rx="13" fill="#ffffff" stroke="#17803d" stroke-width="1"/>
+<text x="888" y="545.5" font-size="12" text-anchor="middle" fill="#17803d">oc_construir_payload</text>
+<rect x="981" y="528" width="110" height="26" rx="13" fill="#ffffff" stroke="#17803d" stroke-width="1"/>
+<text x="1036" y="545.5" font-size="12" text-anchor="middle" fill="#17803d">oc_crear</text>
+<text x="339" y="581" font-size="12.5" fill="#1c2430">El modelo solo envía el nombre del caso: paquete, derivados y payload los relee el backend desde disco.</text>
+<rect x="325" y="635" width="950" height="160" rx="10" fill="#e6f6ec" stroke="#17803d" stroke-width="1.6"/>
+<text x="339" y="659" font-size="16" font-weight="700" fill="#17803d">src/core/ — Núcleo determinístico (sin LLM): aquí decide el backend</text>
+<rect x="339" y="668" width="150" height="26" rx="13" fill="#ffffff" stroke="#17803d" stroke-width="1"/>
+<text x="414" y="685.5" font-size="12" text-anchor="middle" fill="#17803d">Reglas RC1–RC10</text>
+<rect x="497" y="668" width="170" height="26" rx="13" fill="#ffffff" stroke="#17803d" stroke-width="1"/>
+<text x="582" y="685.5" font-size="12" text-anchor="middle" fill="#17803d">Payload + trazabilidad</text>
+<rect x="675" y="668" width="150" height="26" rx="13" fill="#ffffff" stroke="#17803d" stroke-width="1"/>
+<text x="750" y="685.5" font-size="12" text-anchor="middle" fill="#17803d">Evidencia SHA-256</text>
+<rect x="833" y="668" width="180" height="26" rx="13" fill="#ffffff" stroke="#17803d" stroke-width="1"/>
+<text x="923" y="685.5" font-size="12" text-anchor="middle" fill="#17803d">Confirmaciones + huella</text>
+<rect x="339" y="704" width="200" height="26" rx="13" fill="#ffffff" stroke="#17803d" stroke-width="1"/>
+<text x="439" y="721.5" font-size="12" text-anchor="middle" fill="#17803d">Auditoría de confirmaciones</text>
+<rect x="547" y="704" width="110" height="26" rx="13" fill="#ffffff" stroke="#17803d" stroke-width="1"/>
+<text x="602" y="721.5" font-size="12" text-anchor="middle" fill="#17803d">control.csv</text>
+<rect x="665" y="704" width="160" height="26" rx="13" fill="#ffffff" stroke="#17803d" stroke-width="1"/>
+<text x="745" y="721.5" font-size="12" text-anchor="middle" fill="#17803d">Creación idempotente</text>
+<rect x="833" y="704" width="180" height="26" rx="13" fill="#ffffff" stroke="#17803d" stroke-width="1"/>
+<text x="923" y="721.5" font-size="12" text-anchor="middle" fill="#17803d">Numeración 4500000001+</text>
+<text x="339" y="760" font-size="12.5" fill="#1c2430">Bloqueos (RC1–RC4, RC10) → nunca se crea · Confirmaciones (RC5, RC6, RC8, RC9) → solo con frase explícita del usuario + pendiente presentado + huella vigente</text>
+<text x="339" y="779" font-size="12.5" fill="#1c2430">Un caso ya creado devuelve la misma OC (idempotencia por solicitud_id).</text>
+<rect x="325" y="835" width="310" height="100" rx="10" fill="#fff4d6" stroke="#8a5a00" stroke-width="1.6"/>
+<text x="339" y="859" font-size="16" font-weight="700" fill="#8a5a00">src/sap/ — SapAdapter</text>
+<text x="339" y="882" font-size="13" fill="#1c2430">Interfaz + MockSapAdapter</text>
+<text x="339" y="901" font-size="13" fill="#1c2430">(reemplazable por OData / BAPI)</text>
+<rect x="655" y="835" width="300" height="100" rx="10" fill="#f1f4f8" stroke="#5b6675" stroke-width="1.6"/>
+<text x="669" y="859" font-size="16" font-weight="700" fill="#5b6675">fixtures/ — solo lectura</text>
+<text x="669" y="882" font-size="13" fill="#1c2430">Maestros (proveedores, centros,</text>
+<text x="669" y="901" font-size="13" fill="#1c2430">IVA, pagos) + casos sol-001…006</text>
+<rect x="975" y="835" width="300" height="100" rx="10" fill="#fdeceb" stroke="#b42318" stroke-width="1.6"/>
+<text x="989" y="859" font-size="16" font-weight="700" fill="#b42318">out/ — escritura (EFÍMERO)</text>
+<text x="989" y="882" font-size="13" fill="#1c2430">ordenes.jsonl · control.csv · log.jsonl</text>
+<text x="989" y="901" font-size="13" fill="#1c2430">confirmaciones.json · sessions/ · &lt;caso&gt;/</text>
+<rect x="1340" y="150" width="220" height="100" rx="10" fill="#f1f4f8" stroke="#5b6675" stroke-width="1.6"/>
+<text x="1354" y="174" font-size="16" font-weight="700" fill="#5b6675">GitHub</text>
+<text x="1354" y="197" font-size="13" fill="#1c2430">percysoft/RETO-3-IA</text>
+<text x="1354" y="216" font-size="13" fill="#1c2430">rama main</text>
+<rect x="1340" y="305" width="220" height="150" rx="10" fill="#f0eafd" stroke="#6b3fd4" stroke-width="1.6"/>
+<text x="1354" y="329" font-size="16" font-weight="700" fill="#6b3fd4">Anthropic API</text>
+<text x="1354" y="352" font-size="13" fill="#1c2430">Claude Opus 5.5</text>
+<text x="1354" y="371" font-size="13" fill="#1c2430">(claude-opus-5-5)</text>
+<text x="1354" y="390" font-size="13" fill="#1c2430">solo recibe mensajes y</text>
+<text x="1354" y="409" font-size="13" fill="#1c2430">definiciones de herramientas</text>
+<rect x="1340" y="495" width="220" height="300" rx="10" fill="#fff4d6" stroke="#8a5a00" stroke-width="1.6"/>
+<text x="1354" y="519" font-size="16" font-weight="700" fill="#8a5a00">Principio de diseño</text>
+<text x="1354" y="542" font-size="13" fill="#1c2430">El modelo CONVERSA;</text>
+<text x="1354" y="561" font-size="13" fill="#1c2430">el backend DECIDE.</text>
+<text x="1354" y="580" font-size="13" fill="#1c2430"></text>
+<text x="1354" y="599" font-size="13" fill="#1c2430">• Sin autorización no hay OC</text>
+<text x="1354" y="618" font-size="13" fill="#1c2430">• El modelo no puede</text>
+<text x="1354" y="637" font-size="13" fill="#1c2430">  fabricar una confirmación</text>
+<text x="1354" y="656" font-size="13" fill="#1c2430">• Documentos = datos no</text>
+<text x="1354" y="675" font-size="13" fill="#1c2430">  confiables, no instrucciones</text>
+<text x="1354" y="694" font-size="13" fill="#1c2430">• Sin shell ni acceso directo</text>
+<text x="1354" y="713" font-size="13" fill="#1c2430">  a SAP desde el front</text>
+<line x1="270" y1="215" x2="325" y2="215" stroke="#1f5eff" stroke-width="2" marker-end="url(#p)" marker-start="url(#p0)"/>
+<text x="276" y="205" font-size="12" fill="#1f5eff">HTTPS</text>
+<line x1="560" y1="265" x2="560" y2="305" stroke="#5b6675" stroke-width="2" marker-end="url(#p)" />
+<line x1="805" y1="380" x2="835" y2="380" stroke="#6b3fd4" stroke-width="2" marker-end="url(#p)" marker-start="url(#p0)"/>
+<line x1="1275" y1="380" x2="1340" y2="380" stroke="#6b3fd4" stroke-width="2" marker-end="url(#p)" marker-start="url(#p0)"/>
+<text x="1281" y="370" font-size="11" fill="#6b3fd4">mensajes</text><text x="1286" y="398" font-size="11" fill="#6b3fd4">+ tools</text>
+<line x1="560" y1="455" x2="560" y2="495" stroke="#5b6675" stroke-width="2" marker-end="url(#p)" />
+<line x1="800" y1="595" x2="800" y2="635" stroke="#5b6675" stroke-width="2" marker-end="url(#p)" />
+<line x1="470" y1="795" x2="470" y2="835" stroke="#5b6675" stroke-width="2" marker-end="url(#p)" />
+<line x1="805" y1="795" x2="805" y2="835" stroke="#5b6675" stroke-width="2" marker-end="url(#p)" />
+<text x="811" y="819" font-size="12" fill="#5b6675">lee</text>
+<line x1="1125" y1="795" x2="1125" y2="835" stroke="#5b6675" stroke-width="2" marker-end="url(#p)" />
+<text x="1131" y="819" font-size="12" fill="#5b6675">escribe</text>
+<line x1="1340" y1="185" x2="1300" y2="185" stroke="#5b6675" stroke-width="2" marker-end="url(#p)" />
+<text x="1342" y="138" font-size="12" fill="#5b6675">git push → deploy manual</text>
+<text x="40" y="1010" font-size="13" fill="#5b6675">* Solo en modo protegido (ACCESS_KEY). En la demo abierta (ALLOW_OPEN_ACCESS=true) no hay pantalla de clave ni /api/diagnostico. · En Render Free el disco es efímero: out/ se pierde al reiniciar, redesplegar o suspender (15 min sin tráfico).</text>
+</svg>
